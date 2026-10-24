@@ -3,112 +3,201 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111827">
 <title>Alpha Notes</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f3f5fb;color:#20243a}
-header{background:#171b2e;color:white;padding:24px 18px;border-radius:0 0 24px 24px}
-header h1{margin:0 0 8px;font-size:28px}
-header p{margin:0;color:#cbd0e8}
-main{max-width:650px;margin:auto;padding:18px}
-.card{background:white;padding:18px;border-radius:18px;margin-bottom:16px;box-shadow:0 4px 18px #18204410}
-input,textarea{width:100%;padding:13px;border:1px solid #d9ddec;border-radius:10px;font-size:16px;margin:7px 0;font-family:inherit}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+header{background:#111827;color:white;padding:22px 18px}
+header h1{margin:0;font-size:27px}
+header p{color:#cbd5e1;margin:7px 0 0}
+main{max-width:700px;margin:auto;padding:16px}
+input,textarea,button{font:inherit}
+input,textarea{width:100%;padding:13px;margin:6px 0;border:1px solid #d1d5db;border-radius:10px;background:white}
 textarea{min-height:120px;resize:vertical}
-button{border:0;border-radius:10px;padding:12px 16px;background:#6755e8;color:white;font-size:15px;font-weight:bold;cursor:pointer;margin:4px 3px 4px 0}
-.secondary{background:#e9eaf5;color:#292c43}
-.note{border:1px solid #e1e4ef;padding:14px;border-radius:12px;margin-top:12px;overflow-wrap:anywhere}
+button{border:0;border-radius:9px;padding:11px 14px;cursor:pointer}
+.primary{background:#2563eb;color:white;width:100%;margin:8px 0}
+.search{margin:8px 0 16px}
+.note{background:white;border:1px solid #e5e7eb;border-radius:13px;padding:15px;margin:12px 0;overflow-wrap:anywhere}
 .note h3{margin:0 0 8px}
-.note p{white-space:pre-wrap}
-.note img{max-width:100%;max-height:240px;border-radius:10px}
-.small{font-size:12px;color:#737991}
+.note p{white-space:pre-wrap;line-height:1.5}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions button{background:#e5e7eb}
+#status{font-size:14px;color:#166534}
+.empty{text-align:center;color:#6b7280;padding:24px}
 </style>
 </head>
 <body>
 <header>
-<h1>📝 Alpha Notes</h1>
-<p>Your ideas. Your space. Always ready.</p>
+  <h1>📝 Alpha Notes</h1>
+  <p>Your personal notes, all in one place.</p>
 </header>
 <main>
-<section class="card">
-<h2 id="formTitle">Create a note ✨</h2>
-<input id="title" placeholder="Note title">
-<textarea id="content" placeholder="Write your notes here..."></textarea>
-<label for="photo">📷 Add a photo (optional)</label>
-<input id="photo" type="file" accept="image/*">
-<button onclick="saveNote()">Save note</button>
-<button class="secondary" onclick="clearForm()">Clear</button>
-<p class="small">Notes are saved in this browser on this device.</p>
-</section>
-<section class="card">
-<h2>My notes 📚</h2>
-<input id="search" placeholder="🔍 Search your notes..." oninput="renderNotes()">
-<div id="notes"></div>
-</section>
+  <h2 id="formTitle">Create a note</h2>
+  <input id="title" placeholder="Note title">
+  <textarea id="body" placeholder="Write your note here..."></textarea>
+  <button class="primary" id="saveBtn" onclick="saveNote()">＋ Save Note</button>
+  <button id="cancelBtn" onclick="resetForm()" hidden>Cancel edit</button>
+  <p id="status" role="status"></p>
+
+  <h2>My Notes</h2>
+  <input class="search" id="search" placeholder="🔎 Search notes..." oninput="renderNotes()">
+  <div id="notes"></div>
 </main>
 <script>
-let data=[];
-try{data=JSON.parse(localStorage.getItem('alphaNotes')||'[]')}catch(e){data=[]}
-let editing=null;
-function persist(){
-try{localStorage.setItem('alphaNotes',JSON.stringify(data));return true}
-catch(e){alert('Storage full. Try removing a large photo.');return false}
+const KEY = "alpha-notes-v1";
+let items = [];
+let editingId = null;
+
+try {
+  items = JSON.parse(localStorage.getItem(KEY) || "[]");
+  if (!Array.isArray(items)) items = [];
+} catch { items = []; }
+
+function persist() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(items));
+    return true;
+  } catch {
+    document.getElementById("status").textContent =
+      "Could not save. Your browser storage may be full.";
+    return false;
+  }
 }
-function clearForm(){
-editing=null;
-document.getElementById('title').value='';
-document.getElementById('content').value='';
-document.getElementById('photo').value='';
-document.getElementById('formTitle').textContent='Create a note ✨';
+
+function saveNote() {
+  const title = document.getElementById("title").value.trim();
+  const body = document.getElementById("body").value.trim();
+  const status = document.getElementById("status");
+
+  if (!title && !body) {
+    status.textContent = "Please enter a title or note.";
+    return;
+  }
+
+  const oldItems = [...items];
+
+  if (editingId !== null) {
+    items = items.map(n => n.id === editingId
+      ? {...n, title: title || "Untitled", body, updated: Date.now()}
+      : n);
+  } else {
+    items.unshift({
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      title: title || "Untitled",
+      body,
+      updated: Date.now()
+    });
+  }
+
+  if (!persist()) {
+    items = oldItems;
+    return;
+  }
+
+  resetForm();
+  status.textContent = "Note saved successfully!";
+  renderNotes();
 }
-async function saveNote(){
-const title=document.getElementById('title').value.trim();
-const content=document.getElementById('content').value.trim();
-const file=document.getElementById('photo').files[0];
-if(!title&&!content&&!file){alert('Please write a title, note, or choose a photo.');return}
-let photo='';
-if(file){
-if(file.size>700000){alert('Please choose a photo under 700 KB.');return}
-photo=await new Promise((resolve,reject)=>{
-const reader=new FileReader();
-reader.onload=()=>resolve(reader.result);
-reader.onerror=reject;
-reader.readAsDataURL(file);
-}).catch(()=> '');
-if(!photo){alert('Could not read photo. Please try again.');return}
+
+function resetForm() {
+  editingId = null;
+  document.getElementById("title").value = "";
+  document.getElementById("body").value = "";
+  document.getElementById("formTitle").textContent = "Create a note";
+  document.getElementById("saveBtn").textContent = "＋ Save Note";
+  document.getElementById("cancelBtn").hidden = true;
 }
-const old=editing===null?null:data.find(n=>n.id===editing);
-const note={id:editing===null?Date.now():editing,title:title||'Untitled note',content,photo:photo||(old?old.photo:''),updated:new Date().toLocaleString()};
-if(editing===null)data.unshift(note);
-else data=data.map(n=>n.id===editing?note:n);
-if(persist()){clearForm();renderNotes();alert('Note saved!')}
+
+function editNote(id) {
+  const n = items.find(x => x.id === id);
+  if (!n) return;
+  editingId = id;
+  document.getElementById("title").value = n.title;
+  document.getElementById("body").value = n.body;
+  document.getElementById("formTitle").textContent = "Edit note";
+  document.getElementById("saveBtn").textContent = "Save Changes";
+  document.getElementById("cancelBtn").hidden = false;
+  window.scrollTo({top: 0, behavior: "smooth"});
 }
-function renderNotes(){
-const q=document.getElementById('search').value.toLowerCase();
-const root=document.getElementById('notes');
-root.replaceChildren();
-const found=data.filter(n=>(n.title+' '+n.content).toLowerCase().includes(q));
-if(!found.length){root.textContent='No notes yet. Create your first note above!';return}
-found.forEach(n=>{
-const box=document.createElement('article');box.className='note';
-const h=document.createElement('h3');h.textContent=n.title;box.append(h);
-const p=document.createElement('p');p.textContent=n.content;box.append(p);
-if(n.photo){const img=document.createElement('img');img.src=n.photo;img.alt='Attached note photo';box.append(img)}
-const time=document.createElement('div');time.className='small';time.textContent=n.updated||'';box.append(time);
-const edit=document.createElement('button');edit.className='secondary';edit.textContent='Edit';edit.onclick=()=>{
-editing=n.id;
-document.getElementById('title').value=n.title;
-document.getElementById('content').value=n.content;
-document.getElementById('photo').value='';
-document.getElementById('formTitle').textContent='Edit note ✏️';
-window.scrollTo({top:0,behavior:'smooth'});
-};box.append(edit);
-const del=document.createElement('button');del.textContent='Delete';del.onclick=()=>{
-if(confirm('Delete this note?')){data=data.filter(x=>x.id!==n.id);if(persist())renderNotes()}
-};box.append(del);
-root.append(box);
-});
+
+function deleteNote(id) {
+  if (!confirm("Delete this note?")) return;
+  const oldItems = [...items];
+  items = items.filter(n => n.id !== id);
+  if (!persist()) { items = oldItems; return; }
+  renderNotes();
 }
+
+async function shareNote(id) {
+  const n = items.find(x => x.id === id);
+  if (!n) return;
+  const text = n.title + "\n\n" + n.body;
+
+  try {
+    if (navigator.share) {
+      await navigator.share({title: n.title, text});
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+      alert("Note copied. You can paste it into a message.");
+    } else {
+      prompt("Copy your note:", text);
+    }
+  } catch (e) {
+    if (e.name !== "AbortError") alert("Sharing was not available.");
+  }
+}
+
+function renderNotes() {
+  const list = document.getElementById("notes");
+  const q = document.getElementById("search").value.toLowerCase();
+  list.replaceChildren();
+
+  const filtered = items.filter(n =>
+    (n.title + " " + n.body).toLowerCase().includes(q)
+  );
+
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = items.length
+      ? "No matching notes found."
+      : "No notes yet. Create your first note above!";
+    list.append(empty);
+    return;
+  }
+
+  filtered.forEach(n => {
+    const card = document.createElement("article");
+    card.className = "note";
+
+    const heading = document.createElement("h3");
+    heading.textContent = n.title;
+    const content = document.createElement("p");
+    content.textContent = n.body;
+    const date = document.createElement("small");
+    date.textContent = "Updated: " + new Date(n.updated).toLocaleString();
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    function addButton(label, action) {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.onclick = action;
+      actions.append(b);
+    }
+
+    addButton("✏️ Edit", () => editNote(n.id));
+    addButton("↗ Share", () => shareNote(n.id));
+    addButton("🗑 Delete", () => deleteNote(n.id));
+
+    card.append(heading, content, date, actions);
+    list.append(card);
+  });
+}
+
 renderNotes();
 </script>
 </body>
